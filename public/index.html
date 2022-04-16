@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8"/>
+  </head>
+
+  <body>
+  <b>Shared Id: <span id="sharedID"/></b>
+  &nbsp;&nbsp; &nbsp;&nbsp;
+  <button id="callButton" onclick="getScreen();" disabled>Show screen</button>
+    <hr />
+    <button onclick="start();">Connect</button>
+    &nbsp;&nbsp;
+
+    <button onclick="shareScreen();">Share Screen</button>
+    &nbsp;&nbsp;
+   <!-- <input type="checkbox" id="isShareScreen" /> Share Screen-->
+
+    <small>Local Id: <span id="localId"/></small>
+    &nbsp;&nbsp;
+
+
+
+    <input type="text" id="callId" placeholder="Enter remote peer id"/>
+
+
+
+    <button id="hangupButton" onclick="hangup();" disabled>Hang Up</button>
+    <button id="screenShareButton" onclick="shareScreen();" disabled>Share Screen</button>
+    <br />
+    <input type="text" id="chatMessage" placeholder="Enter message"/>
+    <button id="sendMessageButton" onclick="sendMessage();">Send</button>
+    <hr />
+
+    <h3>Local Video</h3>
+    <video id="localVideo" width="640" height="480" autoplay muted></video>
+
+    <h3>Remote Video</h3>
+    <video id="remoteVideo" width="640" height="480" autoplay></video>
+
+    <script src="main.js"></script>
+  </body>
+</html>
