@@ -102,14 +102,7 @@ const stopAll = () => {
 /*
 
 const getLocalMediaStream = async () => {
-  try {
-    const mediaStream = await navigator.mediaDevices.getUserMedia({ audio: false, video: true });
-    console.log('got local media stream');
-    localVideo.srcObject = mediaStream;
-    return mediaStream;
-  } catch (error) {
-    console.error('failed to get local media stream', error);
-  }
+
 };
 */
 const initializePeerConnection = async () => {
@@ -212,4 +205,4 @@ const sendMessage = () => {
     // @ts-ignore
     document.getElementById('chatMessage').value = '';
 };
-//# sourceMappingURL=main.js.map
+//# sourceMappingURL=main1.js.map

@@ -5,6 +5,7 @@ const hangupButton: {disabled: boolean} = document.getElementById('hangupButton'
 const screenShareButton: {disabled: boolean} = document.getElementById('screenShareButton') as any;
 const shareScreenCheck: {checked: boolean} =  document.getElementById('isShareScreen') as any;
 
+
 const ar = window.location.host.split(':');
 
 const socket = new WebSocket('wss://'+ar[0]+':8888');
@@ -40,6 +41,7 @@ socket.onmessage = async ({ data }) => {
         break;
 
       case 'offer':
+
         sharedID = jsonMessage.data.remoteId;
         delete jsonMessage.data.remoteId;
         await initializePeerConnection();
@@ -135,14 +137,7 @@ const stopAll = () => {
 /*
 
 const getLocalMediaStream = async () => {
-  try {
-    const mediaStream = await navigator.mediaDevices.getUserMedia({ audio: false, video: true });
-    console.log('got local media stream');
-    localVideo.srcObject = mediaStream;
-    return mediaStream;
-  } catch (error) {
-    console.error('failed to get local media stream', error);
-  }
+
 };
 */
 
