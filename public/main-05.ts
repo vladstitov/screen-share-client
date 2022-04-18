@@ -1,12 +1,13 @@
 'use strict';
 
 var isChannelReady = false;
-var isInitiator = false;
-var isStarted = false;
+let isSharing = false;
+
 var localStream: MediaStream
-var peer;
+let peer: RTCPeerConnection
 var remoteStream;
 var turnReady;
+let shared_id: string
 
 var pcConfig = {
   'iceServers': [{
@@ -14,7 +15,7 @@ var pcConfig = {
   }]
 };
 
-const NAME = window.location.hash?.slice(1);
+const NAME: string = window.location.hash?.slice(1) || Date.now().toString();
 console.log(NAME)
 const ar1 = window.location.host.split(':');
 
@@ -43,46 +44,57 @@ function sendMessage5(message: string) {
 
 }
 
-function onSocketAction5(action: string, data) {
-  console.log('action:' + action, data);
+function onSocketAction5(action: string, data, sender_id: string) {
+
+  console.log('action:' + action + ' sender ' + sender_id, data);
   switch (action) {
+    case 'welcome':
+      const ar:{id: string, sharing: boolean}[] = data;
+      const shared = ar.find(v => v.sharing);
+      if(shared) {
+        shared_id = shared.id;
+      }
+      else shared_id = null
+        createPeerConnection()
+      break;
     case 'sharing':
       const id = data;
       break;
     case 'no-sharing':
       break;
     case 'connected':
-
       maybeStart();
       break
-    case 'offer':
-      if (!isInitiator && !isStarted) {
-        maybeStart();
-      }
-      peer.setRemoteDescription(new RTCSessionDescription(data));
+    case 'client':
 
-      doAnswer();
+      break;
+    case 'offer':
+      setOfferGetAnswer(peer, data).then(answer => {
+        sendAction5('answer', sender_id, answer)
+
+      });
+
       break;
     case 'answer':
-      if(isStarted) {
+      ///if(isStarted) {
         peer.setRemoteDescription(new RTCSessionDescription(data));
-      }
+    //  }
 
       break
     case 'candidate':
-      if(isStarted) {
+      ///if(isStarted) {
         const candidate = new RTCIceCandidate({
           sdpMLineIndex: data.label,
           candidate: data.candidate
         });
         peer.addIceCandidate(candidate);
-      }
+      //}
 
       break
     case 'bye':
-      if(isStarted) {
+     /// if(isStarted) {
         handleRemoteHangup();
-      }
+      //}
       break
     default:
       break
@@ -149,19 +161,29 @@ if (location.hostname !== 'localhost') {
   );
 }*/
 
-function maybeStart() {
-  console.log('maybeStart() isChannelReady ' + isChannelReady + '  isStarted:' +  isStarted + ' localStream ', localStream?.getTracks());
+function addTracks5() {
+  const tracks: MediaStreamTrack[] = localStream.getTracks()
+  tracks.forEach(function (v) {
+    console.log('adding track ', v)
+    peer.addTrack(v);
+  })
+}
 
-  if (!isStarted && typeof localStream !== 'undefined' && isChannelReady) {
+function maybeStart() {
+  console.log('maybeStart() isChannelReady ' + isChannelReady + '  isStaring' +  isSharing + ' localStream ', localStream?.getTracks());
+
+/*  if (!isStarted && typeof localStream !== 'undefined' && isChannelReady) {
     console.log('>>>>>> creating peer connection');
     createPeerConnection();
-    peer.addStream(localStream);
+
+
+
     isStarted = true;
-    console.log('isInitiator', isInitiator);
-    if (isInitiator) {
-      doCall();
+    console.log('isInitiator', isSharing);
+    if (isSharing) {
+      /// doCall();
     }
-  }
+  }*/
 }
 
 /*
@@ -172,24 +194,54 @@ window.onbeforeunload = function() {
 
 /////////////////////////////////////////////////////////
 
-function createPeerConnection() {
-  try {
-    peer = new RTCPeerConnection(pcConfig);
+function createPeerConnection(): RTCPeerConnection {
+    const peer: RTCPeerConnection = new RTCPeerConnection(pcConfig);
     peer.onicecandidate = handleIceCandidate;
-    peer.onaddstream = handleRemoteStreamAdded;
-    peer.onremovestream = handleRemoteStreamRemoved;
-    console.log('Created RTCPeerConnnection');
-  } catch (e) {
-    console.log('Failed to create PeerConnection, exception: ' + e.message);
-    alert('Cannot create RTCPeerConnection object.');
-    return;
-  }
+
+  peer.onicecandidate = ({ candidate }) => {
+    if (!candidate) return;
+
+    console.log('ICECANDIDATE', candidate.foundation);
+   /// sendSocketMessage( {to: sharedID, action: 'iceCandidate', data:{ candidate} });
+  };
+  peer.oniceconnectionstatechange = () => {
+    console.log('PEER_CHANGED=', peerConnection.iceConnectionState);
+    // If ICE state is disconnected stop
+    if (peerConnection.iceConnectionState === 'disconnected') {
+      alert('Connection has been closed stopping...');
+     ///  socket.close();
+    }
+  };
+  peer.ontrack = ({ track }) => {
+    console.log('ONTRACK', track);
+   /// remoteMediaStream.addTrack(track);
+   /// remoteVideo.srcObject = remoteMediaStream;
+  };
+
+  peer.ondatachannel = ({ channel }) => {
+    console.log('ON_DATA_CHANNEL');
+    dataChannel = channel;
+    /// initializeDataChannelListeners();
+  };
+
+    // @ts-ignore
+  peer.onaddstream = (evt) => {
+      console.log('remote stream added');
+     // remoteStream = evt.stream;
+     // remoteVideo5.srcObject = remoteStream;
+    }
+  // @ts-ignore
+    peer.onremovestream = (evt) => {
+      console.log('remote removed');
+    }
+    console.log('Created RTCPeerConnection');
+  return peer;
 }
 
 function handleIceCandidate(event) {
   console.log('icecandidate event: ', event);
   if (event.candidate) {
-    sendAction5('candidate', { type: 'candidate',
+    sendAction5(null, 'candidate', { type: 'candidate',
       label: event.candidate.sdpMLineIndex,
       id: event.candidate.sdpMid,
       candidate: event.candidate.candidate})
@@ -202,24 +254,34 @@ function handleCreateOfferError(event) {
   console.log('createOffer() error: ', event);
 }
 
-function doCall() {
+async function createOffer5(peer: RTCPeerConnection) {
   console.log('Sending offer to peer');
-  peer.createOffer(setLocalAndSendMessage, handleCreateOfferError);
+  const offer = await peerConnection.createOffer();
+  await peerConnection.setLocalDescription(offer);
+  return offer;
+
+}
+
+async function setOfferGetAnswer(peer: RTCPeerConnection,  offer: RTCSessionDescriptionInit):Promise<RTCSessionDescriptionInit> {
+
+
+  await peer.setRemoteDescription(new RTCSessionDescription(offer));
+  const answer: RTCSessionDescriptionInit = await peer.createAnswer();
+  return answer;
+ /// await peerConnection.setLocalDescription(answer);
+
 }
 
 function doAnswer() {
   console.log('Sending answer to peer.');
-  peer.createAnswer().then(
-    setLocalAndSendMessage,
-    onCreateSessionDescriptionError
-  );
+  peer.createAnswer().then(setLocalAndSendMessage, onCreateSessionDescriptionError );
 }
 
 function setLocalAndSendMessage(sessionDescription) {
   peer.setLocalDescription(sessionDescription);
   console.log('setLocalAndSendMessage sending message', sessionDescription);
   const action = sessionDescription.type;
-  sendAction5(action, sessionDescription);
+  sendAction5(null, action, sessionDescription);
 }
 
 function onCreateSessionDescriptionError(error) {
@@ -230,14 +292,10 @@ function onCreateSessionDescriptionError(error) {
 
 function handleRemoteStreamAdded(event) {
   console.log('Remote stream added.');
-  remoteStream = event.stream;
-  // @ts-ignore
-  remoteVideo5.srcObject = remoteStream;
+
 }
 
-function handleRemoteStreamRemoved(event) {
-  console.log('Remote stream removed. Event: ', event);
-}
+
 
 /*function hangup() {
   console.log('Hanging up.');
@@ -248,20 +306,21 @@ function handleRemoteStreamRemoved(event) {
 function handleRemoteHangup() {
   console.log('Session terminated.');
   stop();
-  isInitiator = false;
+  isSharing = false;
 }
 
 function stop() {
-  isStarted = false;
+ /// isStarted = false;
   peer.close();
   peer = null;
 }
 
 
+
 /////////////////////////////////////
 
 async function shareScreen5() {
-  isInitiator = true;
+  isSharing = true;
   try {
     localStream = await navigator.mediaDevices.getUserMedia({ audio: false, video: true });
 
@@ -270,10 +329,11 @@ async function shareScreen5() {
   }
 
   if(localStream) {
-    sendAction5('sharing', {NAME});
     // @ts-ignore
     localVideo5.srcObject = localStream;
-    maybeStart();
+    sendAction5(null, 'sharing', null);
+
+   // maybeStart();
   }
 }
 
@@ -282,18 +342,21 @@ async function shareScreen5() {
 
 const socket5 = new WebSocket('wss://'+ar1[0]+':8888');
 
-socket5.onmessage = async ({ data }) => {
-  const msg = JSON.parse(data);
+socket5.onmessage = (evt) => {
+  const msg = JSON.parse(evt.data);
   console.log(msg)
-  const action = msg.action
+  const action = msg.action;
+  const sender_id = msg.sender_id;
+  const data = msg.data;
+
   if(action) {
-    onSocketAction5(action, msg)
+    onSocketAction5(action, data, sender_id)
   } else {
     onSocketMessage5(msg)
   }
 }
 
-function sendAction5(action: string, data: any) {
+function sendAction5(to: string, action: string, data: any) {
   socket5.send(JSON.stringify({action,data}));
 }
 
@@ -306,9 +369,15 @@ socket5.onclose = () => {
  /// stopAll();
 };
 
-socket5.onopen = () => {
+socket5.onopen = async () => {
   console.log('socket::open');
-  sendAction5('connected', {NAME} )
+
+peer =  createPeerConnection()
+
+  console.log(peer);
+  if(NAME === 'MAIN') {
+
+  }
 };
 
 

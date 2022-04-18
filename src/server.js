@@ -25,7 +25,6 @@ const wss = new WebSocket.Server({ server: wsServer });
 wss.on('connection', (socket) => {
     console.log('new connection');
     socket.on('message', (data) => {
-        console.log('socket', data);
         try {
             const jsonMessage = JSON.parse(String(data));
             handleJsonMessage(socket, jsonMessage);
@@ -39,55 +38,59 @@ wss.on('connection', (socket) => {
     });
 });
 const handleJsonMessage = (socket, jsonMessage) => {
-    console.log(jsonMessage);
     const action = jsonMessage.action;
+    const to = jsonMessage.to;
     const data = jsonMessage.data;
+    const sender_id = socket.id;
     switch (action) {
-        case 'connected':
-            console.log(wss.clients);
+        case 'start':
             socket.id = jsonMessage.data.NAME;
-            socket.sharing = data.sharing;
             emitMessage(socket, { action: 'welcome', data: getClients() });
-            console.log(wss.clients);
             break;
         case 'sharing':
             socket.sharing = true;
             break;
         case 'get-share':
             const sharing = getShared();
-            if (sharing) {
-                emitMessage(socket, { action: 'sharing', data: sharing.id });
-            }
-            else
-                emitMessage(socket, { action: 'no-sharing' });
+            emitMessage(socket, { action: 'sharing', data: sharing?.id });
             break;
-        case 'dispatch':
+        case 'connected':
+            for (let item of wss.clients) {
+                if (item !== socket)
+                    emitMessage(item, { action: 'client', data: { id: socket.id, sharing: socket.sharing } });
+            }
             break;
         default:
-            if (!jsonMessage.to)
+            if (!to) {
+                console.log('ERROR  no to');
                 return;
-            const remotePeerSocket = getSocketById(jsonMessage.to);
-            if (!remotePeerSocket) {
-                return console.log('failed to find remote socket with id', jsonMessage.to);
+            }
+            const client = getSocketById(to);
+            if (!client) {
+                return console.log('failed to find remote socket with to ' + to);
             }
             /* if (jsonMessage.action !== 'offer') {
                delete jsonMessage.data.remoteId;
              } else {
                jsonMessage.data.remoteId = socket.id;
              }*/
-            emitMessage(remotePeerSocket, jsonMessage);
+            emitMessage(client, { action, data, sender_id });
     }
 };
-const emitMessage = (socket, jsonMessage) => {
+const emitMessage = (socket, obj) => {
     if (socket.readyState === WebSocket.OPEN) {
-        socket.send(JSON.stringify(jsonMessage));
+        socket.send(JSON.stringify(obj));
     }
+    else
+        console.log('ERROR CLOSED ' + socket.id);
 };
 function getShared() {
     return Array.from(wss.clients).find(clients => clients.sharing);
 }
 // @ts-ignore
-const getClients = () => Array.from(wss.clients).map(clients => clients.id);
+const getClients = () => Array.from(wss.clients).map(clients => {
+    return { id: clients.id, sharing: clients.sharing };
+});
 // @ts-ignore
 const getSocketById = (socketId) => Array.from(wss.clients).find((client => client.id === socketId));
 wsServer.listen(8888);
