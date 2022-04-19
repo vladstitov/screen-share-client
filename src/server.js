@@ -42,22 +42,20 @@ const handleJsonMessage = (socket, jsonMessage) => {
     const to = jsonMessage.to;
     const data = jsonMessage.data;
     const sender_id = socket.id;
+    console.log(action, sender_id, data);
     switch (action) {
         case 'start':
-            socket.id = jsonMessage.data.NAME;
-            emitMessage(socket, { action: 'welcome', data: getClients() });
+            socket.id = data;
+            const clients = getClients();
+            for (let item of wss.clients) {
+                emitMessage(item, { action: 'welcome', data: clients });
+            }
             break;
         case 'sharing':
             socket.sharing = true;
-            break;
-        case 'get-share':
-            const sharing = getShared();
-            emitMessage(socket, { action: 'sharing', data: sharing?.id });
-            break;
-        case 'connected':
+            const clients2 = getClients();
             for (let item of wss.clients) {
-                if (item !== socket)
-                    emitMessage(item, { action: 'client', data: { id: socket.id, sharing: socket.sharing } });
+                emitMessage(item, { action: 'welcome', data: clients2 });
             }
             break;
         default:
@@ -65,16 +63,24 @@ const handleJsonMessage = (socket, jsonMessage) => {
                 console.log('ERROR  no to');
                 return;
             }
-            const client = getSocketById(to);
-            if (!client) {
-                return console.log('failed to find remote socket with to ' + to);
+            if (to === 'others') {
+                for (let item of wss.clients) {
+                    if (item !== socket)
+                        emitMessage(item, { action: action, data });
+                }
             }
-            /* if (jsonMessage.action !== 'offer') {
-               delete jsonMessage.data.remoteId;
-             } else {
-               jsonMessage.data.remoteId = socket.id;
-             }*/
-            emitMessage(client, { action, data, sender_id });
+            else {
+                const client = getSocketById(to);
+                if (!client)
+                    emitMessage(socket, { action: 'error', data: 'no ' + sender_id });
+                else
+                    emitMessage(client, { action, data, sender_id });
+            }
+        /* if (jsonMessage.action !== 'offer') {
+           delete jsonMessage.data.remoteId;
+         } else {
+           jsonMessage.data.remoteId = socket.id;
+         }*/
     }
 };
 const emitMessage = (socket, obj) => {

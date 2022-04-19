@@ -1,11 +1,47 @@
 'use strict';
 var isChannelReady = false;
 let isSharing = false;
-var localStream;
+let localStream;
 let peer;
-var remoteStream;
+let remoteStream;
 var turnReady;
-let shared_id;
+let shared_id = {
+    get() {
+        return this.id;
+    },
+    id: null,
+    set(id) {
+        this.id = id;
+        document.getElementById('shared_id').innerText = id;
+    }
+};
+let clients = {
+    get() {
+        return this.clients;
+    },
+    clients: null,
+    async set(clients) {
+        this.clients = clients;
+        let str = '';
+        clients.forEach(function (v) {
+            str += '<li>' + v.id + ' <b> ' + v.sharing + '</b></li>';
+        });
+        document.getElementById('clients').innerHTML = str;
+        if (clients.length > 1) {
+            if (!peer)
+                peer = await createPeerConnection();
+            if (isSharing) {
+                addTracks5(peer);
+                const offer = await createOffer5(peer);
+                clients.forEach(function (v) {
+                    if (!v.sharing) {
+                        sendAction5(v.id, 'offer', offer);
+                    }
+                });
+            }
+        }
+    }
+};
 var pcConfig = {
     'iceServers': [{
             'urls': 'stun:stun.l.google.com:19302'
@@ -35,34 +71,16 @@ function onSocketAction5(action, data, sender_id) {
     console.log('action:' + action + ' sender ' + sender_id, data);
     switch (action) {
         case 'welcome':
-            const ar = data;
-            const shared = ar.find(v => v.sharing);
-            if (shared) {
-                shared_id = shared.id;
-            }
-            else
-                shared_id = null;
-            createPeerConnection();
-            break;
-        case 'sharing':
-            const id = data;
-            break;
-        case 'no-sharing':
-            break;
-        case 'connected':
-            maybeStart();
-            break;
-        case 'client':
+            console.log(data);
+            clients.set(data);
             break;
         case 'offer':
             setOfferGetAnswer(peer, data).then(answer => {
-                sendAction5('answer', sender_id, answer);
+                sendAction5(sender_id, 'answer', answer);
             });
             break;
         case 'answer':
-            ///if(isStarted) {
             peer.setRemoteDescription(new RTCSessionDescription(data));
-            //  }
             break;
         case 'candidate':
             ///if(isStarted) {
@@ -123,7 +141,7 @@ if (location.hostname !== 'localhost') {
     'https://computeengineondemand.appspot.com/turn?username=41784574&key=4080218913'
   );
 }*/
-function addTracks5() {
+function addTracks5(peer) {
     const tracks = localStream.getTracks();
     tracks.forEach(function (v) {
         console.log('adding track ', v);
@@ -170,8 +188,11 @@ function createPeerConnection() {
     };
     peer.ontrack = ({ track }) => {
         console.log('ONTRACK', track);
-        /// remoteMediaStream.addTrack(track);
-        /// remoteVideo.srcObject = remoteMediaStream;
+        if (!remoteStream)
+            remoteStream = new MediaStream();
+        remoteStream.addTrack(track);
+        // @ts-ignore
+        localVideo5.srcObject = remoteStream;
     };
     peer.ondatachannel = ({ channel }) => {
         console.log('ON_DATA_CHANNEL');
@@ -207,9 +228,10 @@ function handleCreateOfferError(event) {
     console.log('createOffer() error: ', event);
 }
 async function createOffer5(peer) {
-    console.log('Sending offer to peer');
-    const offer = await peerConnection.createOffer();
-    await peerConnection.setLocalDescription(offer);
+    if (!peer)
+        return console.error('no peer');
+    const offer = await peer.createOffer();
+    await peer.setLocalDescription(offer);
     return offer;
 }
 async function setOfferGetAnswer(peer, offer) {
@@ -250,6 +272,9 @@ function stop() {
     peer = null;
 }
 /////////////////////////////////////
+async function getShared5() {
+    sendAction5(null, 'get-shared-id', null);
+}
 async function shareScreen5() {
     isSharing = true;
     try {
@@ -281,7 +306,7 @@ socket5.onmessage = (evt) => {
     }
 };
 function sendAction5(to, action, data) {
-    socket5.send(JSON.stringify({ action, data }));
+    socket5.send(JSON.stringify({ to, action, data }));
 }
 socket5.onerror = (error) => {
     console.error('socket::error', error);
@@ -292,9 +317,21 @@ socket5.onclose = () => {
 };
 socket5.onopen = async () => {
     console.log('socket::open');
-    peer = createPeerConnection();
-    console.log(peer);
-    if (NAME === 'MAIN') {
-    }
+    sendAction5(null, 'start', NAME);
 };
+function getRemote(action, data) {
+    return new Promise(function (resole, reject) {
+        const onData = (evt) => {
+            const msg = JSON.parse(evt.data);
+            console.log(msg);
+            const act = msg.action;
+            const data = msg.data;
+            if (act === action) {
+                socket5.removeEventListener('message', onData);
+                resole(data);
+            }
+        };
+        socket5.addEventListener('message', onData);
+    });
+}
 //# sourceMappingURL=main-05.js.map

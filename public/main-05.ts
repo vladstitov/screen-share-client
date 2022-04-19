@@ -3,11 +3,57 @@
 var isChannelReady = false;
 let isSharing = false;
 
-var localStream: MediaStream
+let localStream: MediaStream
 let peer: RTCPeerConnection
-var remoteStream;
+let remoteStream;
+
 var turnReady;
-let shared_id: string
+
+
+let shared_id = {
+  get() {
+
+    return this.id;
+  },
+  id: null,
+  set(id) {
+    this.id = id;
+    document.getElementById('shared_id').innerText = id
+  }
+}
+
+let clients = {
+  get() {
+    return this.clients;
+  },
+  clients: null,
+ async set(clients: {id: string, sharing: boolean}[]) {
+    this.clients = clients;
+    let str = '';
+    clients.forEach(function (v) {
+      str+='<li>'+ v.id + ' <b> ' +v.sharing+  '</b></li>';
+    })
+    document.getElementById('clients').innerHTML = str
+    if(clients.length > 1) {
+      if(!peer) peer = await createPeerConnection();
+      if(isSharing) {
+        addTracks5(peer);
+        const offer = await createOffer5(peer);
+        clients.forEach(function (v) {
+          if(!v.sharing) {
+            sendAction5(v.id, 'offer', offer);
+          }
+        })
+
+      }
+    }
+  }
+
+}
+
+
+
+
 
 var pcConfig = {
   'iceServers': [{
@@ -45,41 +91,19 @@ function sendMessage5(message: string) {
 }
 
 function onSocketAction5(action: string, data, sender_id: string) {
-
   console.log('action:' + action + ' sender ' + sender_id, data);
   switch (action) {
     case 'welcome':
-      const ar:{id: string, sharing: boolean}[] = data;
-      const shared = ar.find(v => v.sharing);
-      if(shared) {
-        shared_id = shared.id;
-      }
-      else shared_id = null
-        createPeerConnection()
-      break;
-    case 'sharing':
-      const id = data;
-      break;
-    case 'no-sharing':
-      break;
-    case 'connected':
-      maybeStart();
-      break
-    case 'client':
-
+      console.log(data)
+      clients.set(data);
       break;
     case 'offer':
       setOfferGetAnswer(peer, data).then(answer => {
-        sendAction5('answer', sender_id, answer)
-
+        sendAction5(sender_id, 'answer', answer)
       });
-
       break;
     case 'answer':
-      ///if(isStarted) {
         peer.setRemoteDescription(new RTCSessionDescription(data));
-    //  }
-
       break
     case 'candidate':
       ///if(isStarted) {
@@ -161,7 +185,7 @@ if (location.hostname !== 'localhost') {
   );
 }*/
 
-function addTracks5() {
+function addTracks5(peer) {
   const tracks: MediaStreamTrack[] = localStream.getTracks()
   tracks.forEach(function (v) {
     console.log('adding track ', v)
@@ -194,6 +218,7 @@ window.onbeforeunload = function() {
 
 /////////////////////////////////////////////////////////
 
+
 function createPeerConnection(): RTCPeerConnection {
     const peer: RTCPeerConnection = new RTCPeerConnection(pcConfig);
     peer.onicecandidate = handleIceCandidate;
@@ -214,8 +239,10 @@ function createPeerConnection(): RTCPeerConnection {
   };
   peer.ontrack = ({ track }) => {
     console.log('ONTRACK', track);
-   /// remoteMediaStream.addTrack(track);
-   /// remoteVideo.srcObject = remoteMediaStream;
+    if(!remoteStream) remoteStream = new MediaStream();
+    remoteStream.addTrack(track);
+    // @ts-ignore
+    localVideo5.srcObject = remoteStream;
   };
 
   peer.ondatachannel = ({ channel }) => {
@@ -255,11 +282,10 @@ function handleCreateOfferError(event) {
 }
 
 async function createOffer5(peer: RTCPeerConnection) {
-  console.log('Sending offer to peer');
-  const offer = await peerConnection.createOffer();
-  await peerConnection.setLocalDescription(offer);
+  if(!peer) return console.error('no peer')
+  const offer = await peer.createOffer();
+  await peer.setLocalDescription(offer);
   return offer;
-
 }
 
 async function setOfferGetAnswer(peer: RTCPeerConnection,  offer: RTCSessionDescriptionInit):Promise<RTCSessionDescriptionInit> {
@@ -319,6 +345,10 @@ function stop() {
 
 /////////////////////////////////////
 
+async function getShared5() {
+  sendAction5(null, 'get-shared-id', null);
+}
+
 async function shareScreen5() {
   isSharing = true;
   try {
@@ -357,7 +387,7 @@ socket5.onmessage = (evt) => {
 }
 
 function sendAction5(to: string, action: string, data: any) {
-  socket5.send(JSON.stringify({action,data}));
+  socket5.send(JSON.stringify({to, action,data}));
 }
 
 socket5.onerror = (error) => {
@@ -371,15 +401,24 @@ socket5.onclose = () => {
 
 socket5.onopen = async () => {
   console.log('socket::open');
-
-peer =  createPeerConnection()
-
-  console.log(peer);
-  if(NAME === 'MAIN') {
-
-  }
+  sendAction5(null, 'start', NAME);
 };
 
+function getRemote(action, data): Promise<any> {
+  return new Promise(function (resole, reject) {
+   const  onData = (evt) => {
+     const msg = JSON.parse(evt.data);
+     console.log(msg);
+     const act = msg.action;
+     const data = msg.data;
+     if(act === action) {
+       socket5.removeEventListener('message', onData)
+       resole(data);
+     }
+   }
+    socket5.addEventListener('message', onData)
+  })
+}
 
 /*
 *

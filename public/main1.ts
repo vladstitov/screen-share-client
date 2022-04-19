@@ -59,7 +59,6 @@ socket.onmessage = async ({ data }) => {
         break;
 
       case 'iceCandidate':
-
         await peerConnection.addIceCandidate(jsonMessage.data.candidate);
         break;
       default: console.warn('unknown action', jsonMessage.to);
