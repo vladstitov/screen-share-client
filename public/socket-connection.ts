@@ -22,7 +22,6 @@ socketCon.onmessage = (evt) => {
 }
 
 function sendAction(to: string, action: string, data: any) {
-    console.log('sending' + to + action, data);
     socketCon.send(JSON.stringify({to, action, data}));
 }
 

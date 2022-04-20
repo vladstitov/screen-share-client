@@ -1,9 +1,10 @@
 // @ts-ignore
 const NAME = 'client';
 let peerClient;
-const remoteVid = document.querySelector('#remoteVideo');
+const clientVideo = document.querySelector('#remoteVideo');
 const clientStream = new MediaStream();
 let sharedNAME;
+let dataChannel;
 function setClientsC(clients) {
     let str = '';
     clients.forEach(function (v) {
@@ -14,7 +15,7 @@ function setClientsC(clients) {
     sharedNAME = shared?.id;
 }
 // @ts-ignore
-async function onSocketAction(action, data, sender_id) {
+function onSocketAction(action, data, sender_id) {
     console.log(action, data);
     switch (action) {
         case 'welcome':
@@ -24,8 +25,9 @@ async function onSocketAction(action, data, sender_id) {
             setOfferSendAnswer(data);
             break;
         case 'candidate':
+            data.type = 'candidate';
             peerClient.addIceCandidate(data).then(res => {
-                console.log(res);
+                /// console.log(res);
             });
             break;
     }
@@ -45,19 +47,24 @@ async function setOfferSendAnswer(offer) {
 }
 function createPeerConnectionC() {
     const peer = new RTCPeerConnection(pcConfig);
-    peer.onicecandidate = (evt) => {
-        console.log('candidate ', evt);
-    };
     peer.onicecandidate = ({ candidate }) => {
         if (!candidate)
             return;
         console.log('ICECANDIDATE', candidate.foundation);
+        if (!sharedNAME) {
+            console.warn(' no sharedNAME');
+            return;
+        }
+        sendAction(sharedNAME, 'candidate', candidate);
+        /*  sdpMLineIndex: evt.candidate.sdpMLineIndex,
+          /// id: evt.candidate.sdpMid
+          candidate: evt.candidate.candidate}*/
         /// sendSocketMessage( {to: sharedID, action: 'iceCandidate', data:{ candidate} });
     };
     peer.oniceconnectionstatechange = () => {
-        console.log('PEER_CHANGED=', peerConnection.iceConnectionState);
+        console.log('PEER_CHANGED=', peerClient.iceConnectionState);
         // If ICE state is disconnected stop
-        if (peerConnection.iceConnectionState === 'disconnected') {
+        if (peerClient.iceConnectionState === 'disconnected') {
             alert('Connection has been closed stopping...');
             ///  socket.close();
         }
@@ -66,7 +73,7 @@ function createPeerConnectionC() {
         console.log('ONTRACK', track);
         clientStream.addTrack(track);
         // @ts-ignore
-        localVideo.srcObject = remoteStream5;
+        clientVideo.srcObject = clientStream;
     };
     peer.ondatachannel = ({ channel }) => {
         console.log('ON_DATA_CHANNEL');

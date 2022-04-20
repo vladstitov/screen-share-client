@@ -35,6 +35,11 @@ async function onSocketAction(action, data, sender_id) {
         case 'answer':
             peerShared.setRemoteDescription(new RTCSessionDescription(data));
             break;
+        case 'candidate':
+            data.type = 'candidate';
+            peerShared.addIceCandidate(data).then(res => {
+                /// console.log(res);
+            });
     }
 }
 // @ts-ignore
@@ -44,6 +49,7 @@ async function sendOfferS() {
     if (!peerShared)
         peerShared = await createPeerConnectionS();
     const tracks = localStream.getTracks();
+    console.log('tracks', tracks);
     tracks.forEach(function (v) {
         peerShared.addTrack(v);
     });
@@ -56,46 +62,42 @@ async function sendOfferS() {
 }
 function createPeerConnectionS() {
     const peer = new RTCPeerConnection(pcConfig);
-    peer.onicecandidate = (evt) => {
-        console.log('icecandidate event: ', evt);
-        if (evt.candidate) {
-            if (!client_id) {
-                console.warn(' no client id');
-                return;
-            }
-            sendAction(client_id, 'candidate', { type: 'candidate',
-                label: evt.candidate.sdpMLineIndex,
-                id: evt.candidate.sdpMid,
-                candidate: evt.candidate.candidate });
+    peer.onicecandidate = ({ candidate }) => {
+        console.log('icecandidate shared: ', candidate);
+        if (!candidate)
+            return;
+        if (!client_id) {
+            console.warn(' no client id');
+            return;
         }
-        else {
-            console.log('End of candidates.');
-        }
+        sendAction(client_id, 'candidate', candidate);
+        /*  sdpMLineIndex: evt.candidate.sdpMLineIndex,
+          /// id: evt.candidate.sdpMid
+          candidate: evt.candidate.candidate}*/
     };
     peer.oniceconnectionstatechange = () => {
-        console.log('PEER_CHANGED=', peerConnection.iceConnectionState);
+        console.log('PEER_CHANGED=', peerShared.iceConnectionState);
         // If ICE state is disconnected stop
-        if (peerConnection.iceConnectionState === 'disconnected') {
-            alert('Connection has been closed stopping...');
-            ///  socket.close();
-        }
+        /* if (peerConnection.iceConnectionState === 'disconnected') {
+             alert('Connection has been closed stopping...');
+             ///  socket.close();
+         }*/
     };
     peer.ontrack = ({ track }) => {
         console.log('ONTRACK', track);
-        if (!remoteStream5)
-            remoteStream5 = new MediaStream();
-        remoteStream5.addTrack(track);
-        // @ts-ignore
-        localVideo5.srcObject = remoteStream5;
+        /* if(!remoteStream5) remoteStream5 = new MediaStream();
+         remoteStream5.addTrack(track);
+         // @ts-ignore
+         localVideo5.srcObject = remoteStream5;*/
     };
     peer.ondatachannel = ({ channel }) => {
-        console.log('ON_DATA_CHANNEL');
+        console.log('ON_DATA_CHANNEL ');
         dataChannel = channel;
         /// initializeDataChannelListeners();
     };
     // @ts-ignore
     peer.onaddstream = (evt) => {
-        console.log('remote stream added');
+        console.log(' remote stream added');
         // remoteStream = evt.stream;
         // remoteVideo5.srcObject = remoteStream;
     };

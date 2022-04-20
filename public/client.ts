@@ -2,10 +2,12 @@
 // @ts-ignore
 const NAME = 'client';
 let peerClient: RTCPeerConnection;
-const remoteVid = document.querySelector('#remoteVideo');
+const clientVideo = document.querySelector('#remoteVideo');
 const clientStream: MediaStream = new MediaStream();
 
 let sharedNAME: string
+
+let dataChannel
 
 function setClientsC(clients: {id: string, sharing: boolean}[]) {
     let str = '';
@@ -19,7 +21,7 @@ function setClientsC(clients: {id: string, sharing: boolean}[]) {
 }
 
 // @ts-ignore
-async function onSocketAction(action: string, data: any, sender_id: string) {
+function onSocketAction(action: string, data: any, sender_id: string) {
     console.log(action, data);
     switch (action) {
         case 'welcome':
@@ -28,10 +30,11 @@ async function onSocketAction(action: string, data: any, sender_id: string) {
         case 'offer':
             setOfferSendAnswer(data);
             break;
-        case 'candidate':
 
+        case 'candidate':
+            data.type = 'candidate';
             peerClient.addIceCandidate(data).then(res => {
-                console.log(res);
+                /// console.log(res);
             })
 
             break;
@@ -55,20 +58,26 @@ async function setOfferSendAnswer(offer) {
 
 function createPeerConnectionC(): RTCPeerConnection {
     const peer: RTCPeerConnection = new RTCPeerConnection(pcConfig);
-    peer.onicecandidate = (evt) => {
-        console.log('candidate ',evt)
-
-    }
-
     peer.onicecandidate = ({ candidate }) => {
         if (!candidate) return;
         console.log('ICECANDIDATE', candidate.foundation);
+
+            if(!sharedNAME) {
+                console.warn(' no sharedNAME');
+                return
+            }
+
+            sendAction(sharedNAME, 'candidate', candidate);
+            /*  sdpMLineIndex: evt.candidate.sdpMLineIndex,
+              /// id: evt.candidate.sdpMid
+              candidate: evt.candidate.candidate}*/
+
         /// sendSocketMessage( {to: sharedID, action: 'iceCandidate', data:{ candidate} });
     };
     peer.oniceconnectionstatechange = () => {
-        console.log('PEER_CHANGED=', peerConnection.iceConnectionState);
+        console.log('PEER_CHANGED=', peerClient.iceConnectionState);
         // If ICE state is disconnected stop
-        if (peerConnection.iceConnectionState === 'disconnected') {
+        if (peerClient.iceConnectionState === 'disconnected') {
             alert('Connection has been closed stopping...');
             ///  socket.close();
         }
@@ -78,7 +87,7 @@ function createPeerConnectionC(): RTCPeerConnection {
         console.log('ONTRACK', track);
         clientStream.addTrack(track);
         // @ts-ignore
-        localVideo.srcObject = remoteStream5;
+        clientVideo.srcObject = clientStream;
     };
 
     peer.ondatachannel = ({ channel }) => {

@@ -1,10 +1,11 @@
+function main1() {
+
 const localVideo:{srcObject: any} = document.getElementById('localVideo') as any;
 const remoteVideo: {srcObject: any} = document.getElementById('remoteVideo') as any;
 const callButton:{disabled: boolean} = document.getElementById('callButton') as any;
 const hangupButton: {disabled: boolean} = document.getElementById('hangupButton') as any;
 const screenShareButton: {disabled: boolean} = document.getElementById('screenShareButton') as any;
 const shareScreenCheck: {checked: boolean} =  document.getElementById('isShareScreen') as any;
-
 
 const ar = window.location.host.split(':');
 
@@ -222,7 +223,8 @@ const shareScreen = async () => {
 
 const getLocalScreenCaptureStream = async () => {
   try {
-    const constraints: DisplayMediaStreamConstraints = { video: { cursor: 'always' }, audio: false } as any;
+    const constraints = { video: { cursor: 'always' }, audio: false } as any;
+
     const screenCaptureStream = await navigator.mediaDevices.getDisplayMedia(constraints);
 
     return screenCaptureStream;
@@ -273,3 +275,5 @@ const sendMessage = () => {
   // @ts-ignore
   document.getElementById('chatMessage').value = '';
 };
+
+}
