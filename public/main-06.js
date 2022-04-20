@@ -46,86 +46,61 @@ if (!room) {
 ****************************************************************************/
 
 // Connect to the signaling server
-const ar = window.location.host.split(':');
+var socket = io.connect();
 
-const socket = new WebSocket('wss://'+ar[0]+':8888');
+socket.on('ipaddr', function(ipaddr) {
+  console.log('Server IP address is: ' + ipaddr);
+  // updateRoomURL(ipaddr);
+});
 
-function socketEmit() {
-  
-}
-
-function shareScreen() {
-  isInitiator = true;
-}
-/*
 socket.on('created', function(room, clientId) {
   console.log('Created room', room, '- my client ID is', clientId);
   isInitiator = true;
   grabWebCamVideo();
 });
-*/
 
-/*socket.on('joined', function(room, clientId) {
+socket.on('joined', function(room, clientId) {
   console.log('This peer has joined room', room, 'with client ID', clientId);
   isInitiator = false;
   createPeerConnection(isInitiator, configuration);
   grabWebCamVideo();
-});*/
+});
 
-/*socket.on('full', function(room) {
+socket.on('full', function(room) {
   alert('Room ' + room + ' is full. We will create a new room for you.');
   window.location.hash = '';
   window.location.reload();
-});*/
+});
 
-socket.onopen = () => {
-  console.log('socket::open');
-
-};
-
-socket.onmessage = async ({ data }) => {
-
-}
-
-socket.onerror = (error) => { console.error('socket::error', error);};
-socket.onclose = () => {
-  console.log('socket::close');
-  // stopAll();
-};
-
-/*
 socket.on('ready', function() {
   console.log('Socket is ready');
- /// createPeerConnection(isInitiator, configuration);
+  createPeerConnection(isInitiator, configuration);
 });
-*/
 
-/*socket.on('log', function(array) {
+socket.on('log', function(array) {
   console.log.apply(console, array);
-});*/
+});
 
-/*
 socket.on('message', function(message) {
   console.log('Client received message:', message);
   signalingMessageCallback(message);
 });
-*/
 
 // Joining a room.
-//// socketEmit('create or join', room);
+socket.emit('create or join', room);
 
-/*if (location.hostname.match(/localhost|127\.0\.0/)) {
-  socketEmit('ipaddr');
-}*/
+if (location.hostname.match(/localhost|127\.0\.0/)) {
+  socket.emit('ipaddr');
+}
 
 // Leaving rooms and disconnecting from peers.
-/*socket.on('disconnect', function(reason) {
+socket.on('disconnect', function(reason) {
   console.log(`Disconnected: ${reason}.`);
   sendBtn.disabled = true;
   snapAndSendBtn.disabled = true;
-});*/
+});
 
-/*socket.on('bye', function(room) {
+socket.on('bye', function(room) {
   console.log(`Peer leaving room ${room}.`);
   sendBtn.disabled = true;
   snapAndSendBtn.disabled = true;
@@ -133,14 +108,20 @@ socket.on('message', function(message) {
   if (!isInitiator) {
     window.location.reload();
   }
-});*/
+});
+
+window.addEventListener('unload', function() {
+  console.log(`Unloading window. Notifying peers in ${room}.`);
+  socket.emit('bye', room);
+});
+
 
 /**
 * Send message to signaling server
 */
 function sendMessage(message) {
   console.log('Client sending message: ', message);
-  socketEmit('message', message);
+  socket.emit('message', message);
 }
 
 /**

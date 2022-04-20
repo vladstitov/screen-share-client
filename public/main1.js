@@ -18,7 +18,7 @@ socket.onopen = () => {
 socket.onmessage = async ({ data }) => {
     try {
         const jsonMessage = JSON.parse(data);
-        console.log('message', jsonMessage);
+        console.log('essage', jsonMessage);
         switch (jsonMessage.action) {
             case 'start':
                 myID = jsonMessage.id;
