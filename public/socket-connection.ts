@@ -1,21 +1,28 @@
-const socketCon = new WebSocket('wss://'+ar1[0]+':8888');
+
+// @ts-ignore
+const pcConfig = {
+    'iceServers': [{
+        'urls': 'stun:stun.l.google.com:19302'
+    }]
+};
+// @ts-ignore
+const ar = window.location.host.split(':');
+const socketCon = new WebSocket('wss://'+ar[0]+':8888');
 
 socketCon.onmessage = (evt) => {
     const msg = JSON.parse(evt.data);
-    console.log(msg)
     const action = msg.action;
     const sender_id = msg.sender_id;
     const data = msg.data;
-
     if(action) {
-        onSocketAction5(action, data, sender_id)
+        onSocketAction(action, data, sender_id)
     } else {
-        onSocketMessage5(msg)
+        onSocketMessage(msg)
     }
 }
 
-
-function sendAction5(to: string, action: string, data: any) {
+function sendAction(to: string, action: string, data: any) {
+    console.log('sending' + to + action, data);
     socketCon.send(JSON.stringify({to, action, data}));
 }
 
@@ -30,7 +37,7 @@ socketCon.onclose = () => {
 
 socketCon.onopen = async () => {
     console.log('socket::open');
-    sendAction5(null, 'start', NAME);
+    sendAction(null, 'start', NAME);
 };
 
 function getRemote(action, data): Promise<any> {

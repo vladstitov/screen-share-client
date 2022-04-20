@@ -2,22 +2,17 @@
 <html>
 
 <head>
-
-  <title>Realtime communication with WebRTC</title>
-
+  <title>Share</title>
   <link rel="stylesheet" href="/css/main.css" />
-
 </head>
 
 <body>
 
-<button onclick="shareScreen5();">Crate Screen</button>
+<button onclick="shareScreenS();">Share Screen</button>
 
-<button onclick="getShared5();">Get Shared</button>
-
+<button onclick="sendOfferS();">Send Offer</button>
 <div>
- Shared id <span id="shared_id"></span>
-  &nbsp;&nbsp;
+ Shared id <span id="shared_id"></span>  &nbsp;&nbsp;
  Clients: <ul id="clients"></ul>
 </div>
 
@@ -26,12 +21,12 @@
 </div>
   <div id="videos">
     <video id="localVideo" autoplay muted playsinline></video>
-    <video id="remoteVideo" autoplay playsinline></video>
   </div>
 
   <!-- This file is automatically added/served when running "node index.js". -->
 
 
+<script src="common.js"></script>
 <script src="share.js"></script>
 <script src="socket-connection.js"></script>
 
